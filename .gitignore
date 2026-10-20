@@ -12,6 +12,9 @@ target/
 .settings
 .springBeans
 .sts4-cache
+combinado.txt
+bash.sh
+.env
 
 ### IntelliJ IDEA ###
 .idea
