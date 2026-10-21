@@ -4,15 +4,18 @@ import java.net.URI;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.santana.chamados.dto.ChamadoRequest;
+import com.santana.chamados.dto.ResolucaoRequest;
 import com.santana.chamados.entity.Chamado;
 import com.santana.chamados.service.ChamadoService;
 
@@ -23,7 +26,6 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/chamados")
 @RequiredArgsConstructor
 public class ChamadoController {
-
 	private final ChamadoService service;
 
 	@PostMapping
@@ -44,5 +46,13 @@ public class ChamadoController {
 	@GetMapping("/{id}")
 	public ResponseEntity<Chamado> buscar(@PathVariable String id, Authentication auth) {
 		return ResponseEntity.ok(service.buscar(id, auth));
+	}
+
+	@PutMapping("/{id}/resolver")
+	@PreAuthorize("hasAnyRole('TECNICO','ADMIN')")
+	public ResponseEntity<Chamado> resolver(@PathVariable String id,
+			@Valid @RequestBody ResolucaoRequest request,
+			Authentication auth) {
+		return ResponseEntity.ok(service.resolver(id, request, auth.getName()));
 	}
 }

@@ -1,365 +1,273 @@
-# ms-chamados — Abertura e Consulta
+## Como testar manualmente (sem terminal)
 
-Microserviço REST de chamados técnicos do **ThinDesk**, construído em
-**Spring Boot 4.1.1** com **Java 21**, **MongoDB** e autenticação por **JWT**.
+Este serviço **não emite JWT**. Ele valida tokens assinados pelo ThinDesk
+(ou por qualquer emissor que compartilhe o mesmo `JWT_SECRET` do `.env`).
+Todo o roteiro abaixo acontece em **interface gráfica**: site de geração
+de chave, editor de texto e Swagger UI. Nenhum comando de shell.
 
-Esta branch (`feature/abertura-consulta`) entrega o **primeiro fluxo de negócio**
-do serviço: o usuário autenticado pode **abrir um chamado** e **consultar seus
-próprios chamados** (ou qualquer chamado, se for técnico/admin). A base
-(dependências, configuração, entidade, repositório, JWT e segurança) veio da
-branch `base` e permanece intacta.
+### 1. Gerar o `JWT_SECRET`
+
+O valor precisa ter **≥ 32 caracteres** (o `jjwt` exige 256 bits para
+HS256). Escolha **uma** das opções:
+
+#### Opção A — site gerador de chave hex (recomendado)
+
+1. Abra <https://www.browserling.com/tools/random-hex>.
+2. Em **Length**, coloque `64`.
+3. Clique em **Generate**.
+4. Copie a string resultante (só `0-9` e `a-f`).
+
+Exemplo de tamanho da chave :
+
+```
+L05050Z11111N07032U04013S03024C12245R02066F03097B04038J04029OP64
+```
+
+#### Opção B — gerenciador de senhas
+
+No 1Password, Bitwarden, KeePassXC ou similar:
+
+1. Crie uma senha nova.
+2. Configure para **64 caracteres**, só letras e números.
+3. Copie.
+
+#### Opção C — frase longa (menos aleatória, mas funciona)
+
+Se você só quer testar localmente e não se importa com a qualidade
+criptográfica da chave de **desenvolvimento**:
+
+```
+thindesk-local-test-secret-key-32bytes-minimum
+```
+
+> ⚠️ Só use isso para **dev local**. Em produção, use sempre algo
+> gerado por `openssl rand -hex 32` ou por um gerenciador de senhas.
 
 ---
 
-## O que esta branch adiciona
+### 2. Colocar o `JWT_SECRET` no `.env`
 
-| Camada     | Arquivo novo/alterado                              |
-| ---------- | -------------------------------------------------- |
-| Controller | `controller/ChamadoController.java`                |
-| DTO        | `dto/ChamadoRequest.java`                          |
-| Service    | `service/ChamadoService.java`                      |
-| Enum       | `enums/Status.java` (corrigido no service)         |
+Abra o arquivo `.env` na **raiz do projeto** com seu editor de texto
+(VSCode, Kate, gedit, Notepad++ — qualquer um). Se o arquivo não
+existir, copie o `.env.example` primeiro.
 
-### `ChamadoController`
-
-Expõe três endpoints REST sob `/api/chamados`:
-
-| Método | Rota                          | Descrição                                |
-| ------ | ----------------------------- | ---------------------------------------- |
-| POST   | `/api/chamados`               | Abre um novo chamado                     |
-| GET    | `/api/chamados/{id}`          | Consulta um chamado pelo id              |
-| GET    | `/api/chamados/usuario/{id}`  | Lista chamados de um solicitante         |
-
-Todos exigem `Authorization: Bearer <token>` válido (o `SecurityConfig` da
-foundation já bloqueia `anyRequest()` que não seja Swagger/health).
-
-### `ChamadoService`
-
-Concentra as regras de negócio:
-
-- **`criar(request, solicitante)`** — monta o `Chamado` com:
-  - `titulo` e `descricao` com `trim()`
-  - `solicitante` extraído do JWT (`Authentication.getName()`)
-  - `status = Status.ABERTO`
-  - `dataAbertura = Instant.now()`
-  - campos de resolução (`tecnico`, `solucao`, `dataResolucao`) ficam `null`
-
-- **`listarPorUsuario(usuario, auth)`** — só permite listar:
-  - os **próprios** chamados, ou
-  - qualquer chamado, se o usuário tiver `ROLE_TECNICO` ou `ROLE_ADMIN`
-  - caso contrário → `403 Forbidden`
-
-- **`buscar(id, auth)`** — busca por id e valida:
-  - `404 Not Found` se o id não existir
-  - `403 Forbidden` se não for dono e não for privilegiado
-
-### `ChamadoRequest`
-
-DTO de entrada com validação Jakarta Bean Validation:
-
-```java
-public record ChamadoRequest(
-    @NotBlank @Size(max = 120)  String titulo,
-    @NotBlank @Size(max = 2000) String descricao
-) {}
-```
-
-Entradas inválidas retornam `400 Bad Request` automaticamente (Hibernate
-Validator acionado pelo `@Valid` no controller).
-
-### `enums/Status`
-
-Enum com dois valores: `ABERTO`, `RESOLVIDO`. A foundation já trazia esse
-arquivo; esta branch **corrige** o `ChamadoService`, que ainda referenciava o
-nome antigo `StatusChamado` (resquício de rename anterior). Também é o tipo
-usado no documento `Chamado`, então serializa como string no JSON
-(`"ABERTO"`, `"RESOLVIDO"`).
-
----
-
-## Modelo de dados
-
-Documento MongoDB `Chamado` na coleção `chamados`:
-
-```json
-{
-  "id":            "65f1c0a8e4b0a1b2c3d4e5f6",
-  "titulo":        "Impressora não imprime",
-  "descricao":     "A impressora do 3º andar não responde desde ontem.",
-  "solicitante":   "joao.silva",
-  "status":        "ABERTO",
-  "dataAbertura":  "2026-10-21T04:35:44.123Z",
-  "tecnico":       null,
-  "solucao":       null,
-  "dataResolucao": null
-}
-```
-
-`solicitante` é `@Indexed` — a query
-`findBySolicitanteOrderByDataAberturaDesc` fica eficiente mesmo com muitos
-documentos.
-
----
-
-## Endpoints em detalhe
-
-### `POST /api/chamados` — abrir chamado
-
-**Headers**
-
-```
-Authorization: Bearer <jwt>
-Content-Type: application/json
-```
-
-**Body**
-
-```json
-{
-  "titulo": "Impressora não imprime",
-  "descricao": "A impressora do 3º andar não responde desde ontem."
-}
-```
-
-**Regras**
-
-- `titulo`: obrigatório, máx. 120 caracteres
-- `descricao`: obrigatória, máx. 2000 caracteres
-- `solicitante` **nunca** vem do body — sempre do `sub` do JWT
-- `status` inicial é sempre `ABERTO`
-
-**Resposta `201 Created`** (com `Location: /api/chamados/{id}`)
-
-```json
-{
-  "id":           "65f1c0a8e4b0a1b2c3d4e5f6",
-  "titulo":       "Impressora não imprime",
-  "descricao":    "A impressora do 3º andar não responde desde ontem.",
-  "solicitante":  "joao.silva",
-  "status":       "ABERTO",
-  "dataAbertura": "2026-10-21T04:35:44.123Z",
-  "tecnico":      null,
-  "solucao":      null,
-  "dataResolucao": null
-}
-```
-
-**Erros**
-
-| HTTP | Motivo                                    |
-| ---- | ----------------------------------------- |
-| 400  | `titulo`/`descricao` vazios ou muito longos |
-| 401  | Sem header `Authorization` ou token inválido |
-
----
-
-### `GET /api/chamados/{id}` — consultar chamado
-
-**Headers**
-
-```
-Authorization: Bearer <jwt>
-```
-
-**Resposta `200 OK`**
-
-```json
-{
-  "id":           "65f1c0a8e4b0a1b2c3d4e5f6",
-  "titulo":       "Impressora não imprime",
-  "solicitante":  "joao.silva",
-  "status":       "ABERTO",
-  "dataAbertura": "2026-10-21T04:35:44.123Z"
-}
-```
-
-**Erros**
-
-| HTTP | Motivo                                                   |
-| ---- | -------------------------------------------------------- |
-| 401  | Sem token / token inválido                               |
-| 403  | Chamado existe, mas o usuário não é dono nem `TECNICO`/`ADMIN` |
-| 404  | Não existe chamado com esse `id`                         |
-
----
-
-### `GET /api/chamados/usuario/{id}` — listar por solicitante
-
-**Headers**
-
-```
-Authorization: Bearer <jwt>
-```
-
-O `{id}` na rota é o **username** do solicitante (o mesmo `sub` do JWT).
-
-**Resposta `200 OK`**
-
-```json
-[
-  {
-    "id": "65f1c0a8e4b0a1b2c3d4e5f6",
-    "titulo": "Impressora não imprime",
-    "solicitante": "joao.silva",
-    "status": "ABERTO",
-    "dataAbertura": "2026-10-21T04:35:44.123Z"
-  },
-  {
-    "id": "65f1c0a8e4b0a1b2c3d4e5f7",
-    "titulo": "VPN cai a cada 10 min",
-    "solicitante": "joao.silva",
-    "status": "RESOLVIDO",
-    "dataAbertura": "2026-10-15T13:02:11.000Z"
-  }
-]
-```
-
-Lista **vazia** (`[]`) se o usuário não tiver chamados — não é erro.
-
-**Erros**
-
-| HTTP | Motivo                                                          |
-| ---- | --------------------------------------------------------------- |
-| 401  | Sem token / token inválido                                      |
-| 403  | `{id}` ≠ usuário do token **e** o usuário não é `TECNICO`/`ADMIN` |
-
----
-
-## Regras de autorização
-
-Toda a autorização é feita **no service**, com base em:
-
-1. `Authentication.getName()` — username do JWT
-2. `Authentication.getAuthorities()` — roles do JWT (`ROLE_TECNICO`, `ROLE_ADMIN`)
-
-| Operação                        | Dono do chamado | `ROLE_TECNICO` / `ROLE_ADMIN` |
-| ------------------------------- | :-------------: | :---------------------------: |
-| Abrir chamado                   |       ✅        |              ✅               |
-| Listar chamados de um usuário   |       ✅        |              ✅               |
-| Consultar um chamado por id     |       ✅        |              ✅               |
-
-Quem não é dono **e** não é privilegiado recebe `403 Forbidden`.
-
-O `SecurityConfig` da foundation já cobre a camada de autenticação: `401`
-para requisição sem token válido, `403` para token válido mas sem permissão.
-Swagger (`/swagger-ui.html`, `/v3/api-docs/**`) e health
-(`/actuator/health`) permanecem públicos.
-
----
-
-## Como rodar
-
-### 1. Variáveis de ambiente
-
-Copie `.env.example` para `.env` e preencha:
+Conteúdo final:
 
 ```env
-MONGO_URI_CHAMADOS=mongodb+srv://USUARIO:SENHA@cluster0.xxxxx.mongodb.net/ms_chamados?appName=ms-chamados
-JWT_SECRET=mesmo-segredo-do-thindesk
+MONGO_URI_CHAMADOS=mongodb://localhost:27017/ms_chamados
+JWT_SECRET=L05050Z11111N07032U04013S03024C12245R02066F03097B04038J04029OP64
 SERVER_PORT=8081
 ```
 
-O `springboot4-dotenv` carrega o `.env` automaticamente.
+**Salve o arquivo** (Ctrl+S / Cmd+S). Não deixe espaço nem newline no
+fim do valor do `JWT_SECRET`.
 
-> **Importante:** `JWT_SECRET` precisa ser **idêntico** ao do serviço
-> autenticador (ThinDesk), senão tokens emitidos lá serão rejeitados aqui.
+> Se preferir nem editar o `.env`, você pode passar a variável direto
+> na configuração do Spring Boot no seu IDE (IntelliJ, Eclipse, VSCode
+> Java). Mas aí perde a vantagem do `dotenv` — o arquivo é a forma
+> mais simples e replicável.
 
-### 2. Build
-
-```bash
-./mvnw clean compile
-```
+---
 
 ### 3. Subir a aplicação
+
+No terminal (o **único** comando desta seção):
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-O serviço sobe em `http://localhost:8081`.
+Ou, se você usa o IDE, clique em **Run** na classe `ChamadosApplication`.
+Aguarde `Started ChamadosApplication in X.XXX seconds`.
 
-### 4. Swagger UI
-
-Com a app rodando, acesse:
-
-```
-http://localhost:8081/swagger-ui.html
-```
-
-Para testar endpoints protegidos no Swagger, clique em **Authorize** e cole o
-JWT (sem `Bearer ` — o Swagger adiciona).
+O `.env` só é lido neste momento. Se depois você mudar o `JWT_SECRET`,
+**pare e suba de novo** — o DevTools não observa `.env`.
 
 ---
 
-## Como testar manualmente
+### 4. Gerar os dois tokens no jwt.io
 
-Obtenha um JWT no serviço autenticador do ThinDesk e guarde em variável:
+Abra <https://jwt.io>. O site tem três painéis: **Decoded** (esquerda),
+**Verify Signature** (embaixo à direita) e **Encoded** (direita).
 
-```bash
-TOKEN="eyJhbGciOiJIUzI1NiJ9..."
+#### 4.1 Token do técnico
+
+1. No painel **Decoded → Header**, deixe como está (`{"alg": "HS256", "typ": "JWT"}`).
+2. No painel **Decoded → Payload**, cole:
+
+   ```json
+   {
+     "sub": "joao.silva",
+     "roles": ["TECNICO"],
+     "preAuth": false,
+     "iat": 1730000000,
+     "exp": 1730003600
+   }
+   ```
+
+3. Em **Verify Signature**, cole o valor do `JWT_SECRET` (o mesmo do
+   `.env`) no campo `your-256-bit-secret`. **Marque** o checkbox
+   `secret base64 encoded` **não** — o valor é texto puro.
+4. O painel **Encoded** atualiza sozinho com o token completo. Copie.
+
+> **Sobre `iat` e `exp`:** são **epoch em segundos**, não data legível.
+> Use o epoch atual. Para consultar: <https://www.epochconverter.com>.
+> `iat = agora`, `exp = agora + 3600` (1 hora de validade). Se `exp`
+> estiver no passado, o `JwtUtil` rejeita com `401` silencioso.
+
+#### 4.2 Token do usuário comum
+
+Repita o passo 4.1, só trocando o payload:
+
+```json
+{
+  "sub": "maria.souza",
+  "roles": [],
+  "preAuth": false,
+  "iat": 1730000000,
+  "exp": 1730003600
+}
 ```
 
-**Abrir um chamado**
+Copie o novo token.
 
-```bash
-curl -i -X POST http://localhost:8081/api/chamados \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-        "titulo": "Impressora não imprime",
-        "descricao": "A impressora do 3º andar não responde desde ontem."
-      }'
-```
-
-Esperado: `201 Created` + `Location: /api/chamados/<id>` + body com o chamado.
-
-**Consultar um chamado**
-
-```bash
-curl -i http://localhost:8081/api/chamados/<id> \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-**Listar chamados do usuário logado**
-
-```bash
-USER=$(curl -s http://localhost:8081/api/chamados/me -H "Authorization: Bearer $TOKEN" >/dev/null; \
-       echo "$TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq -r .sub)
-curl -s http://localhost:8081/api/chamados/usuario/$USER \
-  -H "Authorization: Bearer $TOKEN" | jq
-```
-
-**Tentar ver chamado de outra pessoa (espera 403)**
-
-```bash
-curl -i http://localhost:8081/api/chamados/<id-de-outro> \
-  -H "Authorization: Bearer $TOKEN"
-```
+> **Dica:** o jwt.io mostra o token no painel **Encoded**. Se você colar
+> o token no navegador e ele aparecer com `...` no meio (truncado), use
+> o botão **Copy** (ícone de prancheta) em vez de selecionar com o mouse.
 
 ---
 
-## O que vem depois
+### 5. Autorizar no Swagger UI
 
-Esta branch cobre apenas **abertura e consulta**. As próximas branches devem
-implementar:
+Abra <http://localhost:8081/swagger-ui.html>.
 
-- `PATCH /api/chamados/{id}/status` — atualizar status (com transições
-  válidas `ABERTO → RESOLVIDO` e regra de quem pode executar)
-- `PATCH /api/chamados/{id}/solucao` — registrar técnico, solução e
-  `dataResolucao`
-- `GET /api/chamados?status=...` — filtros e paginação para o painel do
-  técnico
-- `@JaversSpringDataAuditable` no `Chamado` — auditoria via Javers/Mongo
-  (dependência já declarada na foundation)
-- Testes de integração (`@DataMongoTest`, `@WebMvcTest` com
-  `SecurityMockMvcRequestPostProcessors`) cobrindo as regras de
-  autorização do service
+1. Clique em **Authorize** (cadeado, canto superior direito).
+2. No campo **Value**, cole o token do **técnico** — sem o prefixo
+   `Bearer ` (o Swagger adiciona).
+3. Clique em **Authorize**, depois **Close**.
+
+A partir daqui, todo `Try it out` envia o `Authorization: Bearer <token>`
+automaticamente.
 
 ---
 
-## Referências
+### 6. Testar cada endpoint
 
-- [Spring Boot 4.1.1 — documentação](https://docs.spring.io/spring-boot/4.1.1/)
-- [Spring Data MongoDB — query methods](https://docs.spring.io/spring-data/mongodb/reference/repositories/query-methods-details.html)
-- [jjwt 0.13.0 — README](https://github.com/jwtk/jjwt)
-- [Bean Validation — constraints](https://jakarta.ee/specifications/bean-validation/3.1/jakarta-bean-validation-spec-3.1.html)
+O padrão é sempre o mesmo: **clique no endpoint → Try it out →
+preencha → Execute**.
+
+#### `POST /api/chamados` — abrir
+
+- **Body**:
+  ```json
+  {
+    "titulo": "Impressora não imprime",
+    "descricao": "A impressora do 3º andar não responde desde ontem."
+  }
+  ```
+- **Esperado:** `201 Created`, e o objeto com `"status": "ABERTO"`,
+  `"dataAbertura"` preenchida.
+- **Guarde o `id`** para os próximos passos.
+
+**Teste do 400 (validação):** execute de novo com:
+
+```json
+{ "titulo": "", "descricao": "" }
+```
+
+Esperado: `400` com `descricao: A descrição é obrigatória; titulo: O título é obrigatório`.
+
+#### `GET /api/chamados/{id}` — consultar
+
+- **Parâmetro `id`**: cole o `id` retornado no passo anterior.
+- **Esperado:** `200 OK` com o chamado.
+
+#### `GET /api/chamados/usuario/{id}` — listar por solicitante
+
+- **Parâmetro `id`**: `joao.silva` (o `sub` do token do técnico).
+- **Esperado:** `200 OK` com array (pode ser `[]`).
+
+#### `PUT /api/chamados/{id}/resolver` — resolver
+
+- **Parâmetro `id`**: o mesmo do chamado.
+- **Body**:
+  ```json
+  { "solucao": "Reiniciado o serviço de impressão." }
+  ```
+- **Esperado:** `200 OK` com `"status": "RESOLVIDO"`, `"tecnico": "joao.silva"`,
+  `"solucao"` e `"dataResolucao"` preenchidos.
+
+**Teste do 409 (resolver duas vezes):** execute o mesmo endpoint de novo.
+Esperado: `409 Conflict` + `Chamado <id> já está resolvido`.
+
+---
+
+### 7. Trocar o token (técnico → usuário comum)
+
+O Swagger guarda **um** token por aba. Para trocar:
+
+1. Clique em **Authorize**.
+2. Clique em **Logout**.
+3. Cole o token da Maria (o de `roles: []`).
+4. **Authorize** → **Close**.
+
+Agora os endpoints passam a usar o token da Maria.
+
+#### Testes que só funcionam com o token da Maria
+
+**403 do `@PreAuthorize`** (resolver chamado alheio):
+
+- Chame `PUT /api/chamados/{id}/resolver` num chamado **ABERTO** do João.
+- Esperado: `403 Forbidden` + `"Você não tem permissão para esta operação"`
+  (mensagem genérica — o `@PreAuthorize` barrou **antes** do controller).
+
+**403 do service** (ver chamado alheio):
+
+- Chame `GET /api/chamados/{id}` com o id de um chamado do João.
+- Esperado: `403 Forbidden` + `"Você não tem permissão para ver este chamado"`
+  (mensagem específica do `ChamadoService.buscar`).
+
+> **Por que dois 403 diferentes?** As duas camadas de defesa existem de
+> propósito. Se as mensagens fossem iguais, você não saberia qual delas
+> barrou. Assim, o teste diferencia.
+
+---
+
+### 8. Voltar para o modo "sem autorização" (401)
+
+1. **Authorize → Logout → Close**.
+2. Execute qualquer endpoint autenticado.
+3. Esperado: `401 Unauthorized` (sem corpo — o `HttpStatusEntryPoint`
+   responde vazio).
+
+---
+
+### 9. Inspecionar o Mongo (opcional)
+
+Se quiser confirmar que o documento foi persistido corretamente, use
+**MongoDB Compass** (GUI, não terminal):
+
+1. Baixe em <https://www.mongodb.com/products/compass>.
+2. Conecte em `mongodb://localhost:27017`.
+3. Abra o banco `ms_chamados` → coleção `chamados`.
+4. O documento deve ter `status: "RESOLVIDO"`, `tecnico: "joao.silva"`,
+   `solucao`, `dataResolucao` preenchidos.
+
+---
+
+### Resumo do fluxo
+
+```
+[site gerador]    →  JWT_SECRET (64 chars)
+       ↓
+[editor de texto] →  .env
+       ↓
+[./mvnw spring-boot:run]  (único comando shell)
+       ↓
+[jwt.io]          →  TOKEN_TEC + TOKEN_USER
+       ↓
+[Swagger UI]      →  Authorize + Try it out
+```
+
+Nenhum `openssl`, `awk`, `curl` ou `export`. Todo o teste acontece
+clicando.
