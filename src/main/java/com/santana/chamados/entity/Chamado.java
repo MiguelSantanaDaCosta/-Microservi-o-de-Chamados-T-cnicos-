@@ -13,6 +13,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+// documento da coleção chamados no mongo
+// o lombok gera getters, setters e o builder
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,15 +22,20 @@ import lombok.NoArgsConstructor;
 @Document(collection = "chamados")
 public class Chamado {
 
+	// id gerado pelo mongo
 	@Id
 	private String id;
 	private String titulo;
 	private String descricao;
 
+	// solicitante tem índice porque a listagem por usuario filtra por ele
 	@Indexed
 	private String solicitante;
+	// aberto ou resolvido, quem define é o servidor
 	private Status status;
+	// data e hora em UTC do momento da abertura
 	private Instant dataAbertura;
+	// solução, tecnico e data de resolução só são preenchidos quando o chamado é resolvido
 	private String solucao;
 	private String tecnico;
 	private Instant dataResolucao;

@@ -33,6 +33,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+// camada HTTP: recebe a requisição, valida o corpo e manda para o service
+// regra de negócio não fica aqui
 @RestController
 @RequestMapping("/api/chamados")
 @RequiredArgsConstructor
@@ -40,8 +42,13 @@ import lombok.RequiredArgsConstructor;
 @SecurityRequirement(name = OpenApiConfig.ESQUEMA_JWT)
 public class ChamadoController {
 
+    // o lombok gera o construtor que injeta o service
     private final ChamadoService service;
 
+    // POST /api/chamados: abre um chamado
+    // a validação confere título e descrição, se falhar volta 400
+    // o solicitante vem do JWT, nunca do corpo
+    // responde 201 com o header location apontando para o chamado novo
     @Operation(summary = "Abre um chamado",
             description = "Solicitante vem do JWT; status ABERTO e dataAbertura são definidos pelo servidor.")
     @ApiResponse(responseCode = "201", description = "Chamado criado")
@@ -50,12 +57,17 @@ public class ChamadoController {
     @PostMapping
     public ResponseEntity<Chamado> abrir(@Valid @RequestBody ChamadoRequest request,
                                          Authentication auth) {
+        // o nome do usuario vem do token que o filtro já validou
         Chamado criado = service.criar(request, auth.getName());
         return ResponseEntity
                 .created(URI.create("/api/chamados/" + criado.getId()))
                 .body(criado);
     }
 
+    // GET /api/chamados/usuario/{id}: lista os chamados de um usuario
+    // o id aqui é o username do solicitante
+    // usuario comum só vê os próprios, tecnico e admin veem de qualquer um (quem checa é o service)
+    // volta do mais recente para o mais antigo
     @Operation(summary = "Lista os chamados de um usuário",
             description = "Usuário comum só consulta os próprios; TECNICO e ADMIN consultam qualquer um.")
     @ApiResponse(responseCode = "200", description = "Lista de chamados (mais recentes primeiro)")
@@ -67,6 +79,8 @@ public class ChamadoController {
         return ResponseEntity.ok(service.listarPorUsuario(usuario, auth));
     }
 
+    // GET /api/chamados/{id}: mostra os detalhes e o status de um chamado
+    // 404 se não existir e 403 se não for o dono nem tecnico ou admin
     @Operation(summary = "Consulta um chamado", description = "Retorna detalhes e status do chamado.")
     @ApiResponse(responseCode = "200", description = "Chamado encontrado")
     @ApiResponse(responseCode = "401", description = "Token ausente ou inválido")
@@ -77,6 +91,10 @@ public class ChamadoController {
         return ResponseEntity.ok(service.buscar(id, auth));
     }
 
+    // PUT /api/chamados/{id}/resolver: o tecnico registra a solução
+    // o preauthorize logo abaixo barra com 403 quem não é tecnico ou admin
+    // o tecnico gravado é o usuario do token
+    // se já estiver resolvido o service lança 409
     @Operation(summary = "Resolve um chamado",
             description = "Apenas TECNICO ou ADMIN. Grava solução, técnico, status RESOLVIDO e dataResolucao.")
     @ApiResponse(responseCode = "200", description = "Chamado resolvido")
