@@ -605,24 +605,6 @@ para não vazar a existência de um id alheio.
 | Erro de build `cannot find symbol` | Falta de `./mvnw clean` | `./mvnw clean package` |
 | `mongosh` reclama de SSL | Certificado | `mongosh "mongodb+srv://..." --tls` |
 
----
-
-## ✅ Checklist final de teste
-
-- [ ] `.env` configurado com Mongo (Atlas ou local) e `JWT_SECRET` próprio
-- [ ] App sobe sem erro (`Started ChamadosApplication`)
-- [ ] `/actuator/health` retorna `{"status":"UP"}`
-- [ ] Swagger UI abre em `http://localhost:8081/swagger-ui.html`
-- [ ] Token do técnico autorizado e `POST` retorna `201`
-- [ ] `PUT /resolver` retorna `200` com `status: RESOLVIDO`
-- [ ] Segundo `PUT` retorna `409`
-- [ ] Token da Maria em endpoint de técnico retorna `403`
-- [ ] Sem token, qualquer endpoint retorna `401` vazio
-- [ ] `mongosh` ou Atlas Compass confirmam os documentos gravados
-- [ ] Índice em `solicitante` existe (`getIndexes`)
-- [ ] `trim()` validado (regex de espaços retorna vazio)
-
----
 
 ## 📎 Referências
 
