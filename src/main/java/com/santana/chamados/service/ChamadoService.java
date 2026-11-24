@@ -43,6 +43,11 @@ public class ChamadoService {
         return repository.findBySolicitanteOrderByDataAberturaDesc(usuario);
     }
 
+    // fila do técnico: todos os chamados ainda abertos, do mais antigo para o mais novo
+    public List<Chamado> listarAbertos() {
+        return repository.findByStatusOrderByDataAberturaAsc(Status.ABERTO);
+    }
+
     // busca um chamado pelo id
     // 404 se não existir, 403 se não for o dono nem tecnico ou admin
     public Chamado buscar(String id, Authentication auth) {

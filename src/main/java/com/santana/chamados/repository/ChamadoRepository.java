@@ -13,4 +13,7 @@ public interface ChamadoRepository extends MongoRepository<Chamado, String> {
 	// o spring monta a query só pelo nome do método
 	// busca por solicitante e ordena pela data de abertura, do mais recente para o mais antigo
 	List<Chamado> findBySolicitanteOrderByDataAberturaDesc(String solicitante);
+
+	// fila do técnico: chamados com o status pedido, os mais antigos primeiro
+	List<Chamado> findByStatusOrderByDataAberturaAsc(com.santana.chamados.enums.Status status);
 }

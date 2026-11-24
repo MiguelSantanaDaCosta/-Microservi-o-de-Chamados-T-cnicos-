@@ -79,6 +79,17 @@ public class ChamadoController {
         return ResponseEntity.ok(service.listarPorUsuario(usuario, auth));
     }
 
+    // GET /api/chamados/abertos: fila de chamados em aberto (só TECNICO ou ADMIN)
+    // declarado antes do /{id}; o caminho literal tem prioridade no spring
+    @Operation(summary = "Lista os chamados abertos", description = "Apenas TECNICO ou ADMIN.")
+    @ApiResponse(responseCode = "200", description = "Chamados com status ABERTO (mais antigos primeiro)")
+    @ApiResponse(responseCode = "403", description = "Usuário sem papel de técnico")
+    @GetMapping("/abertos")
+    @PreAuthorize("hasAnyRole('TECNICO','ADMIN')")
+    public ResponseEntity<List<Chamado>> listarAbertos() {
+        return ResponseEntity.ok(service.listarAbertos());
+    }
+
     // GET /api/chamados/{id}: mostra os detalhes e o status de um chamado
     // 404 se não existir e 403 se não for o dono nem tecnico ou admin
     @Operation(summary = "Consulta um chamado", description = "Retorna detalhes e status do chamado.")
