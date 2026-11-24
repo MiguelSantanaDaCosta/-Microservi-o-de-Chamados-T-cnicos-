@@ -1,0 +1,9 @@
+.git
+.env
+target
+combinado.txt
+bash.sh
+.classpath
+.project
+.settings
+.factorypath
