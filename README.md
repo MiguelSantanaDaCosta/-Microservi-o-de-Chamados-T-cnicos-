@@ -23,6 +23,8 @@
 13. [Regras de negócio](#-regras-de-negócio)
 14. [Códigos de status](#-códigos-de-status)
 15. [Troubleshooting](#-troubleshooting)
+16. [Papéis (alinhados ao Thindesk)](#-papéis-alinhados-ao-thindesk)
+17. [Versionamento e releases](#️-versionamento)
 
 ---
 
@@ -118,7 +120,8 @@ Cliente  →  JwtAuthFilter  →  SecurityConfig  →  ChamadoController
 | Método | Entrada | Saída | Regra protegida |
 |---|---|---|---|
 | `criar(ChamadoRequest, String solicitante)` | DTO + username do JWT | `Chamado` persistido | **Cliente pede, servidor define** — solicitante vem do JWT, status e data da factory |
-| `listarPorUsuario(String usuario, Authentication auth)` | username + `Authentication` | `List<Chamado>` | **Só o dono vê** (ou TECNICO/ADMIN) |
+| `listarPorUsuario(String usuario, Authentication auth)` | username + `Authentication` | `List<Chamado>` | **Só o dono vê** (ou TECNICO/ADMIN/ROOT) |
+| `listarAbertos()` | — | `List<Chamado>` | Fila do técnico: status `ABERTO`, do mais antigo ao mais novo (a restrição de papel está no controller) |
 | `buscar(String id, Authentication auth)` | id + `Authentication` | `Chamado` | **404 antes de 403** (não vaza existência) |
 | `resolver(String id, ResolucaoRequest, String tecnico)` | id + DTO + username do JWT | `Chamado` atualizado | **Imutável após RESOLVIDO** (409) |
 | `obter(String id)` *(privado)* | id | `Chamado` | Helper — busca ou lança 404 |
@@ -130,7 +133,8 @@ Cliente  →  JwtAuthFilter  →  SecurityConfig  →  ChamadoController
 | `POST` | `/api/chamados` | `abrir` | Autenticado |
 | `GET` | `/api/chamados/usuario/{id}` | `listarPorUsuario` | Autenticado (service filtra) |
 | `GET` | `/api/chamados/{id}` | `buscar` | Autenticado (service filtra) |
-| `PUT` | `/api/chamados/{id}/resolver` | `resolver` | **TECNICO** ou **ADMIN** |
+| `GET` | `/api/chamados/abertos` | `listarAbertos` | **TECNICO**, **ADMIN** ou **ROOT** |
+| `PUT` | `/api/chamados/{id}/resolver` | `resolver` | **TECNICO**, **ADMIN** ou **ROOT** |
 
 ### `Chamado` — entidade (`@Document(collection = "chamados")`)
 
@@ -301,6 +305,18 @@ No `.env`, use:
 MONGO_URI_CHAMADOS=mongodb://localhost:27017/ms_chamados
 ```
 
+### Opção C — Docker (como no deploy da AWS)
+
+O `Dockerfile` é multi-stage (JDK 21 para compilar, JRE 21 para executar, usuário não-root) e escuta na porta `8081`.
+
+```bash
+docker build -t ms-chamados .
+docker run -d --name ms-chamados -p 8081:8081 --env-file .env ms-chamados
+```
+
+No deploy real ele roda atrás do Thindesk, dentro do `docker-compose.yml` do repositório
+[Sistema-de-Login-Seguro](https://github.com/MiguelSantanaDaCosta/Sistema-de-Login-Seguro), em rede interna (sem porta pública).
+
 ### Verificação rápida
 
 ```bash
@@ -372,7 +388,7 @@ Copiar o novo token do painel **Encoded**.
 | Campo | Valor | Motivo |
 |---|---|---|
 | `sub` | `joao.silva` / `maria.souza` | Vira `auth.getName()` → o **solicitante** dos chamados |
-| `roles` | `["TECNICO"]` / `[]` | O `JwtUtil` normaliza para `ROLE_TECNICO`. Lista vazia = usuário comum |
+| `roles` | `["ROLE_TECNICO"]` / `["ROLE_ADMIN"]` / `["ROLE_ROOT"]` / `[]` | O `JwtUtil` normaliza o prefixo `ROLE_`. Lista vazia ou só `ROLE_USUARIO` = usuário comum |
 | `preAuth` | `false` | Token com `preAuth: true` é a **etapa intermediária** do login do ThinDesk — este serviço **rejeita** |
 | `iat` | qualquer passado | Não é validado |
 | `exp` | **futuro distante** (`4070908800` = jan/2099) | Imune a expiração durante testes |
@@ -564,7 +580,7 @@ if (!usuario.equals(auth.getName()) && !PapelUtil.isPrivilegiado(auth)) {
 }
 ```
 
-**TECNICO** e **ADMIN** veem de qualquer um (`PapelUtil.isPrivilegiado`).
+**TECNICO**, **ADMIN** e **ROOT** veem de qualquer um (`PapelUtil.isPrivilegiado`).
 
 ### 3. Chamado resolvido é imutável
 
@@ -638,7 +654,7 @@ MAJOR.MINOR.PATCH[-PRÉ-RELEASE]
 | `-alpha` / `-beta` / `-rc.N` | Pré-release: em desenvolvimento / funcional e em testes / candidata a lançamento | `1.0.0-beta` → `1.0.0-rc.1` → `1.0.0` |
 
 A versão fica no `pom.xml`, o histórico no [`CHANGELOG.md`](CHANGELOG.md) e cada lançamento é uma tag Git anotada
-(`v1.0.0-beta`) publicada na aba [Releases](https://github.com/MiguelSantanaDaCosta/-Microservi-o-de-Chamados-T-cnicos-/releases).
+(`v1.0.0-beta`) publicada na aba [Releases](https://github.com/MiguelSantanaDaCosta/-Microservi-o-de-Chamados-T-cnicos-/releases). As notas de cada versão ficam em [`docs/releases/`](docs/releases/) e o guia de publicação em [`docs/RELEASES.md`](docs/RELEASES.md).
 
 | Versão | Descrição |
 | ------ | --------- |
