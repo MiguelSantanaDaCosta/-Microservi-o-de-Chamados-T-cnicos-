@@ -3,6 +3,13 @@
 Formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Versionamento Semântico 2.0.0](https://semver.org/lang/pt-BR/)
 (`MAJOR.MINOR.PATCH[-PRÉ-RELEASE]`).
 
+## [1.0.0-beta.2] - 2026-11-25
+
+### Alterado
+- **Papéis alinhados ao Thindesk** (`ROOT › ADMIN › TECNICO › USUARIO`): `ROLE_ROOT` passa a ter poderes de técnico
+  (listar de qualquer usuário, fila de abertos e resolver). Antes um token só com `ROLE_ROOT` era tratado como usuário comum.
+- `@PreAuthorize` de `/abertos` e `/{id}/resolver` aceita `TECNICO`, `ADMIN` e `ROOT`.
+
 ## [1.0.0-beta] - 2026-11-25
 
 ### Adicionado
@@ -24,5 +31,6 @@ Formato [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Versionam
 - Regras de negócio: solicitante e datas definidos pelo servidor, chamado resolvido imutável (`409`).
 - Validações, tratamento global de erros, Swagger/OpenAPI e auditoria com JaVers.
 
+[1.0.0-beta.2]: https://github.com/MiguelSantanaDaCosta/-Microservi-o-de-Chamados-T-cnicos-/releases/tag/v1.0.0-beta.2
 [1.0.0-beta]: https://github.com/MiguelSantanaDaCosta/-Microservi-o-de-Chamados-T-cnicos-/releases/tag/v1.0.0-beta
 [1.0.0-alpha]: https://github.com/MiguelSantanaDaCosta/-Microservi-o-de-Chamados-T-cnicos-/releases/tag/v1.0.0-alpha

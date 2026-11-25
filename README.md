@@ -606,9 +606,25 @@ para não vazar a existência de um id alheio.
 | `mongosh` reclama de SSL | Certificado | `mongosh "mongodb+srv://..." --tls` |
 
 
+## 👥 Papéis (alinhados ao Thindesk)
+
+Os papéis seguem a mesma hierarquia do Thindesk: `ROOT › ADMIN › TECNICO › USUARIO` (cada perfil herda os de baixo). O Thindesk envia no JWT a lista de papéis já expandida; o `ms-chamados` reaplica a regra em `PapelUtil`, então um token com um único papel também funciona.
+
+| Operação | Endpoint | USUARIO | TECNICO | ADMIN | ROOT |
+| -------- | -------- | :-----: | :-----: | :---: | :--: |
+| Abrir chamado | `POST /api/chamados` | ✅ | ✅ | ✅ | ✅ |
+| Listar/ver os próprios | `GET /api/chamados/usuario/{eu}` · `GET /{id}` | ✅ | ✅ | ✅ | ✅ |
+| Listar/ver os de outro usuário | `GET /api/chamados/usuario/{outro}` · `GET /{id}` | ❌ 403 | ✅ | ✅ | ✅ |
+| Fila de abertos | `GET /api/chamados/abertos` | ❌ 403 | ✅ | ✅ | ✅ |
+| Resolver | `PUT /api/chamados/{id}/resolver` | ❌ 403 | ✅ | ✅ | ✅ |
+
+No `jwt.io` (Passo 4) use `roles: ["ROLE_TECNICO"]`, `["ROLE_ADMIN"]`, `["ROLE_ROOT"]` ou `[]`/`["ROLE_USUARIO"]` para testar cada perfil.
+
+---
+
 ## 🏷️ Versionamento
 
-**Versão atual: `1.0.0-beta`** — padrão [Versionamento Semântico 2.0.0](https://semver.org/lang/pt-BR/):
+**Versão atual: `1.0.0-beta.2`** — padrão [Versionamento Semântico 2.0.0](https://semver.org/lang/pt-BR/):
 
 ```
 MAJOR.MINOR.PATCH[-PRÉ-RELEASE]
@@ -628,6 +644,7 @@ A versão fica no `pom.xml`, o histórico no [`CHANGELOG.md`](CHANGELOG.md) e ca
 | ------ | --------- |
 | `1.0.0-alpha` | API REST de chamados (abrir, consultar, resolver), JWT, validações e Swagger |
 | `1.0.0-beta` | Endpoint da fila do técnico (`/abertos`), Dockerfile e deploy na AWS integrado ao Thindesk |
+| `1.0.0-beta.2` | Papéis alinhados à hierarquia do Thindesk (`ROOT › ADMIN › TECNICO › USUARIO`) |
 
 ---
 

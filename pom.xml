@@ -14,7 +14,7 @@
 
     <groupId>com.santana</groupId>
     <artifactId>chamados</artifactId>
-    <version>1.0.0-beta</version>
+    <version>1.0.0-beta.2</version>
     <packaging>jar</packaging>
 
     <name>ms-chamados</name>
