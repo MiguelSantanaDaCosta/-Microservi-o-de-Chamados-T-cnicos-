@@ -606,6 +606,31 @@ para não vazar a existência de um id alheio.
 | `mongosh` reclama de SSL | Certificado | `mongosh "mongodb+srv://..." --tls` |
 
 
+## 🏷️ Versionamento
+
+**Versão atual: `1.0.0-beta`** — padrão [Versionamento Semântico 2.0.0](https://semver.org/lang/pt-BR/):
+
+```
+MAJOR.MINOR.PATCH[-PRÉ-RELEASE]
+```
+
+| Parte | Quando incrementar | Exemplo |
+| ----- | ------------------ | ------- |
+| `MAJOR` | Mudança incompatível na API (rota, contrato JSON ou regra de negócio) | `1.0.0` → `2.0.0` |
+| `MINOR` | Novo endpoint ou funcionalidade compatível | `1.0.0` → `1.1.0` |
+| `PATCH` | Correção de bug compatível | `1.0.0` → `1.0.1` |
+| `-alpha` / `-beta` / `-rc.N` | Pré-release: em desenvolvimento / funcional e em testes / candidata a lançamento | `1.0.0-beta` → `1.0.0-rc.1` → `1.0.0` |
+
+A versão fica no `pom.xml`, o histórico no [`CHANGELOG.md`](CHANGELOG.md) e cada lançamento é uma tag Git anotada
+(`v1.0.0-beta`) publicada na aba [Releases](https://github.com/MiguelSantanaDaCosta/-Microservi-o-de-Chamados-T-cnicos-/releases).
+
+| Versão | Descrição |
+| ------ | --------- |
+| `1.0.0-alpha` | API REST de chamados (abrir, consultar, resolver), JWT, validações e Swagger |
+| `1.0.0-beta` | Endpoint da fila do técnico (`/abertos`), Dockerfile e deploy na AWS integrado ao Thindesk |
+
+---
+
 ## 📎 Referências
 
 - [Spring Boot — Documentação oficial](https://docs.spring.io/spring-boot/docs/current/reference/html/)
