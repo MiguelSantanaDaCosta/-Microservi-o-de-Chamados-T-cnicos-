@@ -69,7 +69,7 @@ public class ChamadoController {
     // usuario comum só vê os próprios, tecnico e admin veem de qualquer um (quem checa é o service)
     // volta do mais recente para o mais antigo
     @Operation(summary = "Lista os chamados de um usuário",
-            description = "Usuário comum só consulta os próprios; TECNICO e ADMIN consultam qualquer um.")
+            description = "Usuário comum só consulta os próprios; TECNICO, ADMIN e ROOT consultam qualquer um.")
     @ApiResponse(responseCode = "200", description = "Lista de chamados (mais recentes primeiro)")
     @ApiResponse(responseCode = "401", description = "Token ausente ou inválido")
     @ApiResponse(responseCode = "403", description = "Sem permissão para ver chamados deste usuário")
@@ -81,11 +81,11 @@ public class ChamadoController {
 
     // GET /api/chamados/abertos: fila de chamados em aberto (só TECNICO ou ADMIN)
     // declarado antes do /{id}; o caminho literal tem prioridade no spring
-    @Operation(summary = "Lista os chamados abertos", description = "Apenas TECNICO ou ADMIN.")
+    @Operation(summary = "Lista os chamados abertos", description = "Apenas TECNICO, ADMIN ou ROOT.")
     @ApiResponse(responseCode = "200", description = "Chamados com status ABERTO (mais antigos primeiro)")
     @ApiResponse(responseCode = "403", description = "Usuário sem papel de técnico")
     @GetMapping("/abertos")
-    @PreAuthorize("hasAnyRole('TECNICO','ADMIN')")
+    @PreAuthorize("hasAnyRole('TECNICO','ADMIN','ROOT')")
     public ResponseEntity<List<Chamado>> listarAbertos() {
         return ResponseEntity.ok(service.listarAbertos());
     }
@@ -107,7 +107,7 @@ public class ChamadoController {
     // o tecnico gravado é o usuario do token
     // se já estiver resolvido o service lança 409
     @Operation(summary = "Resolve um chamado",
-            description = "Apenas TECNICO ou ADMIN. Grava solução, técnico, status RESOLVIDO e dataResolucao.")
+            description = "Apenas TECNICO, ADMIN ou ROOT. Grava solução, técnico, status RESOLVIDO e dataResolucao.")
     @ApiResponse(responseCode = "200", description = "Chamado resolvido")
     @ApiResponse(responseCode = "400", description = "Solução inválida")
     @ApiResponse(responseCode = "401", description = "Token ausente ou inválido")
@@ -115,7 +115,7 @@ public class ChamadoController {
     @ApiResponse(responseCode = "404", description = "Chamado inexistente")
     @ApiResponse(responseCode = "409", description = "Chamado já resolvido (imutável)")
     @PutMapping("/{id}/resolver")
-    @PreAuthorize("hasAnyRole('TECNICO','ADMIN')")
+    @PreAuthorize("hasAnyRole('TECNICO','ADMIN','ROOT')")
     public ResponseEntity<Chamado> resolver(@PathVariable String id,
                                             @Valid @RequestBody ResolucaoRequest request,
                                             Authentication auth) {
